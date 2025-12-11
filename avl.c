@@ -136,8 +136,7 @@ int static recursive_insert_pt(Node **root, Verb *value)
 
     if (wcscmp((*root)->value->portuguese, value->portuguese) > 0)                 // Se for menor, desce para a esquerda
         result = recursive_insert_pt(&(*root)->left, value);
-
-    if (wcscmp((*root)->value->portuguese, value->portuguese) < 0)                 // Se for maior, desce para a direita
+    else if (wcscmp((*root)->value->portuguese, value->portuguese) < 0)                 // Se for maior, desce para a direita
         result = recursive_insert_pt(&(*root)->right, value);
 
     if (result)                                     // Atualiza a altura e rebalanceia
@@ -167,8 +166,7 @@ int static recursive_insert_sp(Node **root, Verb *value)
 
     if (wcscmp((*root)->value->spanish, value->spanish) > 0)                 // Se for menor, desce para a esquerda
         result = recursive_insert_sp(&(*root)->left, value);
-
-    if (wcscmp((*root)->value->spanish, value->spanish) < 0)                 // Se for maior, desce para a direita
+    else if (wcscmp((*root)->value->spanish, value->spanish) < 0)                 // Se for maior, desce para a direita
         result = recursive_insert_sp(&(*root)->right, value);
 
     if (result)                                     // Atualiza a altura e rebalanceia
@@ -298,15 +296,18 @@ int static recursive_remove_sp(Node **root, wchar_t *word)
     return result;
 }
 
-void static recursive_free(Node *root)
+void static recursive_free(Node *root, int *delete_verb_memory)
 {
     if (!root)
         return;
 
-    recursive_free(root->left);
-    recursive_free(root->right);
-    delete_verb(&(root->value));
-    free(root);
+    recursive_free(root->left, delete_verb_memory);
+    recursive_free(root->right, delete_verb_memory);
+
+    if (*delete_verb_memory)
+        delete_verb(&(root->value));
+    else
+        free(root);
 }
 
 void static recursive_get_size(Node *root, int *count)
@@ -371,54 +372,64 @@ void static recursive_show_in_order(Node *root)
     recursive_show_in_order(root->right);
 }
 
+void static recursive_save_on_file(FILE *file, Node *node)
+{
+    if (!file || !node)
+        return;
+
+    fwrite(node->value, sizeof(Verb), 1, file);
+    recursive_save_on_file(file, node->left);
+    recursive_save_on_file(file, node->right);
+}
+
 //Funções expostas:
 
-Avl *create_avl()
+Avl *new_avl()
 {
     return (Avl*)calloc(1, sizeof(Avl));
+}
+
+void free_data(Avl **tree)
+{
+    if (!*tree) return;
+
+    int delete = 1;
+    recursive_free((*tree)->root, &delete);
 }
 
 void free_avl(Avl **tree)
 {
     if (!*tree) return;
 
-    recursive_free((*tree)->root);
+    int delete = 0;
+    recursive_free((*tree)->root, &delete);
     free(*tree);
 
     *tree = NULL;
 }
 
-int insert_pt_avl(Avl *tree, Verb *value)
+int insert_avl(Avl *tree, Verb *value, Language language)
 {
     if (!tree || !value)
         return 0;
 
-    return recursive_insert_pt(&tree->root, value);
+    if (language == portuguese)
+        return recursive_insert_pt(&tree->root, value);
+    else if (language == spanish)
+        return recursive_insert_sp(&tree->root, value);
 }
 
-int remove_pt_avl(Avl *tree, wchar_t word[WORD_LENGTH])
+int remove_avl(Avl *tree, wchar_t word[WORD_LENGTH], Language language)
 {
     if (!tree)
         return 0;
 
-    return recursive_remove_pt(&tree->root, word);
+    if (language == portuguese)
+        return recursive_remove_pt(&tree->root, word);
+    else if (language == spanish)
+        return recursive_remove_sp(&tree->root, word); 
 }
 
-int insert_sp_avl(Avl *tree, Verb *value)
-{
-    if (!tree || !value)
-        return 0;
-
-    return recursive_insert_sp(&tree->root, value);
-}
-
-int remove_sp_avl(Avl *tree, wchar_t word[WORD_LENGTH])
-{
-    if (!tree)
-        return 0;
-
-    return recursive_remove_sp(&tree->root, word);
-}
 
 
 int get_size(Avl *tree)
@@ -461,4 +472,39 @@ void show_as_tree_avl(Avl *tree)
 
     recursive_show_tree(tree->root, 1);
     printf("\n");
+}
+
+int load_from_file(FILE *file, Avl *portuguese_tree, Avl *spanish_tree)
+{
+    if (!file || !portuguese_tree)
+        return 0;
+
+    Verb verb = {0};
+
+    while (fread(&verb, sizeof(Verb), 1, file) == 1)
+    {
+        Verb *copy = new_verb_from_verb(&verb);
+
+        if (!copy)
+            return 0;
+
+        insert_avl(portuguese_tree, copy, portuguese);
+        insert_avl(spanish_tree, copy, spanish);
+    }
+
+    fseek(file, 0, SEEK_SET);
+
+    return 1;
+}
+
+int save_on_file(FILE *file, Avl *tree)
+{
+    if (!file || !tree)
+        return 0;
+
+    recursive_save_on_file(file, tree->root);
+
+    fseek(file, 0, SEEK_SET);
+
+    return 1;
 }

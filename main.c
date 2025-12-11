@@ -4,25 +4,59 @@
 #include <avl.h>
 #include <wchar.h>
 
+#define FILE_NAME "verbs.dat"
+
+FILE *open_file(char name[])
+{
+    if (!name)
+        return NULL;
+
+    FILE *file = fopen(name, "rb+");
+
+    if (!file)
+        file = fopen(name, "wb+");
+
+    return file;
+}
+
 int main()
 {
     setlocale(LC_ALL, "");
     printf("\x1b[8;30;80t");
     fflush(stdout);
 
-    printf("Olá mundo\n\n");
+    FILE *file = open_file(FILE_NAME);
 
-    Avl *portuguese = create_avl();
+    Avl *portuguese_tree = new_avl();
+    Avl *spanish_tree = new_avl();
 
-    if (!portuguese) return 0;
+    if (!portuguese_tree)
+    {
+        fclose(file);
+        return 0;
+    }
 
-    show_in_order_avl(portuguese);
+    if (!spanish_tree)
+    {
+        fclose(file);
+        free_avl(&portuguese_tree);
+        return 0;
+    }
 
-    insert_pt_avl(portuguese, new_verb(L"Banana", L"B"));
-    insert_pt_avl(portuguese, new_verb(L"Aanana", L"A"));
-    insert_pt_avl(portuguese, new_verb(L"Canana", L"A"));
+    load_from_file(file, portuguese_tree, spanish_tree);
 
-    free_avl(&portuguese);
+    Verb *teste = new_verb(L"A", L"Z");
+
+    insert_avl(portuguese_tree, teste, portuguese);
+    insert_avl(spanish_tree, teste, spanish);
+
+    save_on_file(file, portuguese_tree);
+
+    free_data(&portuguese_tree);
+    free_avl(&portuguese_tree);
+    free_avl(&spanish_tree);
+
+    fclose(file);
 
     return 0;
 }

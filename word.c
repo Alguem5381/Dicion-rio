@@ -14,6 +14,18 @@ Verb *new_verb(wchar_t *portuguese, wchar_t *spanish)
     return verb;
 }
 
+Verb *new_verb_from_verb(Verb* verb)
+{
+    Verb *copy = (Verb*) calloc(1, sizeof(Verb));
+
+    if (!verb)
+        return NULL;
+
+    *copy = *verb;
+
+    return copy;
+}
+
 void delete_verb(Verb **verb)
 {
     if (!verb)
